@@ -51,8 +51,8 @@
     <!-- Contenedor Principal -->
     <div id="app-container" class="w-full max-w-7xl mx-auto">
 
-        <!-- Vista de Login (Inicialmente visible) -->
-        <div id="login-view" class="text-center bg-gray-800 p-8 rounded-2xl shadow-2xl max-w-md mx-auto">
+        <!-- Vista de Login (Oculta por defecto) -->
+        <div id="login-view" class="hidden text-center bg-gray-800 p-8 rounded-2xl shadow-2xl max-w-md mx-auto">
             <h1 class="text-3xl font-bold mb-2 text-cyan-400">Calendario de AniList</h1>
             <p class="text-gray-400 mb-6">Introduce tu nombre de usuario para ver tus animes pendientes.</p>
             <form id="login-form" class="flex flex-col sm:flex-row gap-4">
@@ -77,17 +77,15 @@
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                     </button>
                 </div>
-                <button id="change-user-btn" class="bg-gray-700 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm">
-                    Cambiar Usuario
-                </button>
+                <!-- El botón para cambiar de usuario ha sido eliminado -->
             </header>
             <div id="calendar-grid" class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-4">
                 <!-- Las tarjetas de los días se generarán aquí -->
             </div>
         </div>
 
-        <!-- Loader (Inicialmente oculto) -->
-        <div id="loader-view" class="hidden text-center">
+        <!-- Loader (Visible al inicio) -->
+        <div id="loader-view" class="text-center">
             <div class="loader mx-auto"></div>
             <p id="loader-message" class="mt-4 text-lg font-medium text-gray-300">Buscando tus animes pendientes...</p>
         </div>
@@ -104,7 +102,7 @@
                 </button>
             </div>
             <div id="modal-body" class="p-6 overflow-y-auto space-y-4">
-                <!-- El contenido del modal se genera aquí -->
+
             </div>
         </div>
     </div>
@@ -116,16 +114,11 @@
         const calendarView = document.getElementById('calendar-view');
         const loaderView = document.getElementById('loader-view');
         const loaderMessage = document.getElementById('loader-message');
-        const loginForm = document.getElementById('login-form');
-        const usernameInput = document.getElementById('username-input');
-        const loginButton = document.getElementById('login-button');
-        const loginError = document.getElementById('login-error');
         const calendarHeader = document.getElementById('calendar-header');
         const calendarGrid = document.getElementById('calendar-grid');
         const prevWeekBtn = document.getElementById('prev-week-btn');
         const nextWeekBtn = document.getElementById('next-week-btn');
         const todayBtn = document.getElementById('today-btn');
-        const changeUserBtn = document.getElementById('change-user-btn');
         const animeModal = document.getElementById('anime-modal');
         const modalTitle = document.getElementById('modal-title');
         const modalBody = document.getElementById('modal-body');
@@ -171,11 +164,9 @@
 
         async function startUserSession(username) {
             showView('loader');
-            loginError.textContent = '';
-            loginButton.disabled = true;
 
             try {
-                loaderMessage.textContent = 'Obteniendo tu lista y progreso...';
+                loaderMessage.textContent = `Obteniendo la lista de '${username}'...`;
                 const data = await fetchGraphQL(USER_PROJECTION_QUERY, { username });
                 if (!data.MediaListCollection) throw new Error("Usuario no encontrado o sin lista pública.");
 
@@ -187,10 +178,10 @@
 
             } catch (error) {
                 console.error("Error al obtener datos de AniList:", error);
-                loginError.textContent = `Error: ${error.message}`;
-                showView('login');
-            } finally {
-                loginButton.disabled = false;
+                const loaderIcon = document.querySelector('#loader-view .loader');
+                if(loaderIcon) loaderIcon.style.display = 'none';
+                loaderMessage.textContent = `Error: ${error.message}. Por favor, recarga la página.`;
+                showView('loader');
             }
         }
         
@@ -233,7 +224,6 @@
             });
         }
 
-        // --- LÓGICA DE RENDERIZADO ---
         function renderCalendar() {
             calendarGrid.innerHTML = '';
             const startOfWeek = new Date(currentDate);
@@ -340,12 +330,6 @@
         }
 
         // --- EVENT LISTENERS ---
-        loginForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const username = usernameInput.value.trim();
-            if (username) startUserSession(username);
-        });
-
         prevWeekBtn.addEventListener('click', () => {
             currentDate.setDate(currentDate.getDate() - 7);
             renderCalendar();
@@ -361,15 +345,12 @@
             renderCalendar();
         });
 
-        changeUserBtn.addEventListener('click', () => {
-            usernameInput.value = '';
-            showView('login');
-        });
-
         modalCloseBtn.addEventListener('click', hideAnimeModal);
         animeModal.addEventListener('click', (e) => {
             if (e.target === animeModal) hideAnimeModal();
         });
+
+        startUserSession('AkiroZen');
     });
     </script>
 </body>
