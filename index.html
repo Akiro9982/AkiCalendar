@@ -111,7 +111,10 @@
         try {
           userToken = await getAccessToken(code);
           localStorage.setItem('userToken', userToken);  // Guarda el token en el almacenamiento local
-          window.history.replaceState({}, document.title, window.location.pathname);  // Limpia la URL del código
+          
+          // Limpiar la URL para quitar el código de autorización
+          window.history.replaceState({}, document.title, window.location.pathname);
+
           loginBtn.classList.add('hidden');
           calendarContainer.classList.remove('hidden');
           loadCalendar();
