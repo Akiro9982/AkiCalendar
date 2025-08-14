@@ -95,7 +95,11 @@
       });
 
       const data = await response.json();
-      return data.access_token;
+      if (data.access_token) {
+        return data.access_token;
+      } else {
+        throw new Error('No se pudo obtener el token de acceso');
+      }
     };
 
     // Función para manejar la respuesta de autorización y obtener el token
@@ -104,11 +108,16 @@
       const code = urlParams.get('code');
 
       if (code) {
-        userToken = await getAccessToken(code);
-        localStorage.setItem('userToken', userToken);
-        loginBtn.classList.add('hidden');
-        calendarContainer.classList.remove('hidden');
-        loadCalendar();
+        try {
+          userToken = await getAccessToken(code);
+          localStorage.setItem('userToken', userToken);  // Guarda el token en el almacenamiento local
+          window.history.replaceState({}, document.title, window.location.pathname);  // Limpia la URL del código
+          loginBtn.classList.add('hidden');
+          calendarContainer.classList.remove('hidden');
+          loadCalendar();
+        } catch (error) {
+          console.error('Error al obtener el token:', error);
+        }
       }
     };
 
