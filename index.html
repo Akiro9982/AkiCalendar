@@ -1,262 +1,183 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Calendario de Emisiones de AniList</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calendario AniList</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f0f0f0;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background-color: #4caf50;
+      padding: 20px;
+      color: white;
+      text-align: center;
+    }
+    .calendar {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      grid-gap: 10px;
+      margin: 20px;
+    }
+    .day {
+      padding: 20px;
+      background-color: white;
+      text-align: center;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+    }
+    .day span {
+      display: block;
+      font-weight: bold;
+    }
+    .login-btn {
+      background-color: #4caf50;
+      color: white;
+      padding: 10px 20px;
+      border: none;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+    .login-btn:hover {
+      background-color: #45a049;
+    }
+    .hidden {
+      display: none;
+    }
+  </style>
 </head>
-<body class="min-h-screen bg-gray-900 text-white">
+<body>
+  <header>
+    <h1>Calendario de Episodios AniList</h1>
+    <button id="login-btn" class="login-btn">Iniciar sesión con AniList</button>
+  </header>
+  
+  <div id="calendar-container" class="hidden">
+    <div class="calendar" id="calendar"></div>
+  </div>
 
-    <div id="app-container" class="max-w-7xl mx-auto p-4">
+  <script>
+    const loginBtn = document.getElementById('login-btn');
+    const calendarContainer = document.getElementById('calendar-container');
+    const calendarElement = document.getElementById('calendar');
+    let userToken = null;
 
-        <!-- Login Screen -->
-        <div id="login-view" class="flex justify-center items-center min-h-screen bg-gradient-to-r from-cyan-500 to-blue-500">
-            <div class="bg-gray-800 p-8 rounded-xl shadow-2xl text-center max-w-lg">
-                <h1 class="text-3xl font-bold mb-4 text-white">Inicia sesión con AniList</h1>
-                <p class="text-gray-300 mb-6">Ingresa con tu cuenta para ver tus animes pendientes.</p>
-                <button id="login-button" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-6 rounded-lg transition-colors">
-                    Iniciar sesión
-                </button>
-            </div>
-        </div>
+    // Función para autenticar al usuario con AniList
+    const authenticateUser = async () => {
+      const clientId = '26249'; // Reemplaza con tu CLIENT_ID
+      const clientSecret = 'akvPqDlG7J1kf5oKYHWiRVnq7eggFVaJ5GXZw1n7'; // Reemplaza con tu CLIENT_SECRET
+      const redirectUri = 'https://akirozen9982.github.io/AkiCalendar/'; // Reemplaza con tu REDIRECT_URI
+      const authUrl = `https://anilist.co/api/v2/oauth/authorize?client_id=${clientId}&response_type=token&redirect_uri=${redirectUri}`;
 
-        <!-- Calendar View -->
-        <div id="calendar-view" class="hidden">
-            <header class="flex justify-between items-center mb-6">
-                <h2 id="calendar-header" class="text-2xl font-semibold"></h2>
-                <button id="logout-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Cerrar sesión</button>
-            </header>
+      window.location.href = authUrl;
+    };
 
-            <div id="calendar-grid" class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-4"></div>
-        </div>
+    // Función para manejar el token de acceso
+    const handleAuthResponse = () => {
+      const params = new URLSearchParams(window.location.hash.substring(1));
+      userToken = params.get('access_token');
+      
+      if (userToken) {
+        localStorage.setItem('userToken', userToken);
+        loginBtn.classList.add('hidden');
+        calendarContainer.classList.remove('hidden');
+        loadCalendar();
+      }
+    };
 
-        <!-- Loader -->
-        <div id="loader-view" class="hidden text-center">
-            <div class="loader mx-auto mb-4"></div>
-            <p id="loader-message" class="text-gray-300">Cargando...</p>
-        </div>
+    // Cargar el calendario con los episodios
+    const loadCalendar = async () => {
+      const episodes = await getEpisodes(userToken);
+      renderCalendar(episodes);
+    };
 
-    </div>
-
-    <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        const loginView = document.getElementById('login-view');
-        const calendarView = document.getElementById('calendar-view');
-        const loaderView = document.getElementById('loader-view');
-        const loaderMessage = document.getElementById('loader-message');
-        const calendarHeader = document.getElementById('calendar-header');
-        const calendarGrid = document.getElementById('calendar-grid');
-        const logoutBtn = document.getElementById('logout-btn');
-        
-        let currentDate = new Date();
-        let fullSchedule = {};
-
-        // AniList API query
-        const USER_PROJECTION_QUERY = `
-        query ($username: String) {
-          MediaListCollection(userName: $username, type: ANIME, status: CURRENT) {
-            lists {
-              entries {
-                progress
-                media {
-                  id
-                  title { romaji english }
-                  coverImage { large }
-                  siteUrl
-                  episodes
-                  nextAiringEpisode {
-                    airingAt
-                    episode
-                  }
+    // Obtener episodios desde AniList API
+    const getEpisodes = async (token) => {
+      const query = `
+        query {
+          Viewer {
+            mediaList(mediaType: ANIME, status: WATCHING) {
+              media {
+                id
+                title {
+                  romaji
+                }
+                episodes
+                startDate {
+                  year
+                  month
+                  day
                 }
               }
             }
           }
-        }`;
-
-        const CLIENT_ID = '26249'; // AniList client ID
-        const CLIENT_SECRET = 'akvPqDlG7J1kf5oKYHWiRVnq7eggFVaJ5GXZw1n7'; // AniList client secret
-        const REDIRECT_URI = 'https://akirozen9982.github.io/AkiCalendar/'; // URL to redirect after login
-        const AUTH_URL = `https://anilist.co/api/v2/oauth/authorize?client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=code`;
-
-        async function fetchGraphQL(query, variables) {
-            const response = await fetch('https://graphql.anilist.co', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify({ query, variables })
-            });
-            const data = await response.json();
-            if (data.errors) throw new Error(data.errors.map(e => e.message).join('\n'));
-            return data.data;
         }
+      `;
+      
+      const response = await fetch('https://graphql.anilist.co', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query })
+      });
+      
+      const data = await response.json();
+      return data.data.Viewer.mediaList.map(item => ({
+        title: item.media.title.romaji,
+        episodes: item.media.episodes,
+        startDate: item.media.startDate,
+      }));
+    };
 
-        // Redirect to AniList login page
-        function loginAniList() {
-            window.location.href = AUTH_URL;
-        }
+    // Renderizar el calendario
+    const renderCalendar = (episodes) => {
+      const currentDate = new Date();
+      const currentMonth = currentDate.getMonth();
+      const currentYear = currentDate.getFullYear();
+      const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+      const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
 
-        // Process the authorization code
-        async function handleAuthorizationCode() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const code = urlParams.get('code');
-            if (!code) return;
+      let calendarHTML = '';
+      for (let i = 0; i < firstDayOfMonth; i++) {
+        calendarHTML += `<div class="day"></div>`;
+      }
 
-            const response = await fetch('https://anilist.co/api/v2/oauth/token', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    client_id: CLIENT_ID,
-                    client_secret: CLIENT_SECRET,
-                    redirect_uri: REDIRECT_URI,
-                    code: code,
-                    grant_type: 'authorization_code'
-                })
-            });
+      for (let day = 1; day <= daysInMonth; day++) {
+        calendarHTML += `
+          <div class="day">
+            <span>${day}</span>
+            <div class="episodes">
+              ${episodes
+                .filter(episode => episode.startDate.day === day)
+                .map(episode => `<p>${episode.title} - Episodio ${episode.episodes}</p>`)
+                .join('')}
+            </div>
+          </div>
+        `;
+      }
 
-            const data = await response.json();
-            if (data.access_token) {
-                sessionStorage.setItem('accessToken', data.access_token);
-                startUserSession();
-            } else {
-                console.error('Error al obtener el token de acceso.');
-            }
-        }
+      calendarElement.innerHTML = calendarHTML;
+    };
 
-        // Start user session after login
-        async function startUserSession() {
-            const accessToken = sessionStorage.getItem('accessToken');
-            if (!accessToken) {
-                showView('login');
-                return;
-            }
+    // Manejar el login
+    loginBtn.addEventListener('click', authenticateUser);
 
-            showView('loader');
-            try {
-                loaderMessage.textContent = 'Obteniendo la lista de tus animes...';
-                const data = await fetchGraphQL(USER_PROJECTION_QUERY, { username: 'AkiroZen' });
-                if (!data.MediaListCollection) throw new Error('Usuario no encontrado o sin lista pública.');
-
-                loaderMessage.textContent = 'Calculando tu calendario futuro...';
-                processAndProjectApiData(data.MediaListCollection);
-                renderCalendar();
-                showView('calendar');
-            } catch (error) {
-                console.error("Error al obtener datos de AniList:", error);
-                loaderMessage.textContent = `Error: ${error.message}. Por favor, recarga la página.`;
-                showView('loader');
-            }
-        }
-
-        function processAndProjectApiData(mediaListCollection) {
-            fullSchedule = {};
-            const WEEK_IN_SECONDS = 7 * 24 * 60 * 60;
-
-            mediaListCollection.lists.forEach(list => {
-                list.entries.forEach(entry => {
-                    const { progress, media } = entry;
-                    const { nextAiringEpisode, episodes: totalEpisodes } = media;
-
-                    if (!nextAiringEpisode) return;
-
-                    const anchorEpisode = nextAiringEpisode.episode;
-                    const anchorAiringAt = nextAiringEpisode.airingAt;
-
-                    const finalEpisode = totalEpisodes || (anchorEpisode + 24);
-
-                    for (let epNum = progress + 1; epNum <= finalEpisode; epNum++) {
-                        const episodeOffset = epNum - anchorEpisode;
-                        const projectedAiringAt = anchorAiringAt + (episodeOffset * WEEK_IN_SECONDS);
-                        
-                        const airingDate = new Date(projectedAiringAt * 1000);
-                        const dateKey = `${airingDate.getFullYear()}-${String(airingDate.getMonth() + 1).padStart(2, '0')}-${String(airingDate.getDate()).padStart(2, '0')}`;
-                        
-                        if (!fullSchedule[dateKey]) fullSchedule[dateKey] = [];
-                        
-                        const projectedEpisode = {
-                            airingAt: projectedAiringAt,
-                            episode: epNum,
-                            media: { ...media }
-                        };
-                        
-                        fullSchedule[dateKey].push(projectedEpisode);
-                    }
-                });
-            });
-        }
-
-        function renderCalendar() {
-            calendarGrid.innerHTML = '';
-            const startOfWeek = new Date(currentDate);
-            startOfWeek.setDate(currentDate.getDate() - startOfWeek.getDay());
-
-            calendarHeader.textContent = `Semana del ${startOfWeek.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}`;
-
-            for (let i = 0; i < 7; i++) {
-                const day = new Date(startOfWeek);
-                day.setDate(startOfWeek.getDate() + i);
-                
-                const dayCard = document.createElement('div');
-                dayCard.className = 'day-card bg-gray-800 rounded-lg p-4 flex flex-col min-h-[250px]';
-                
-                const dateKey = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
-                const animesForDay = fullSchedule[dateKey] || [];
-
-                let headerClass = 'font-bold text-lg mb-3';
-                if (isToday(day)) {
-                    dayCard.classList.add('border-2', 'border-cyan-500');
-                    headerClass += ' text-cyan-400';
-                }
-
-                dayCard.innerHTML = `
-                    <div>
-                        <h3 class="${headerClass}">${day.toLocaleDateString('es-ES', { weekday: 'long' })}</h3>
-                        <p class="text-gray-400 text-sm mb-4">${day.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })}</p>
-                    </div>
-                    <div class="anime-list flex-grow space-y-2 overflow-y-auto"></div>
-                `;
-
-                const animeListContainer = dayCard.querySelector('.anime-list');
-                if (animesForDay.length > 0) {
-                    animesForDay.sort((a,b) => a.airingAt - b.airingAt).forEach(animeEp => {
-                        const animeEl = document.createElement('div');
-                        animeEl.className = 'flex items-center gap-3';
-                        animeEl.innerHTML = `
-                            <img src="${animeEp.media.coverImage.large}" class="w-10 h-14 object-cover rounded-md">
-                            <div class="flex-1 min-w-0">
-                                <p class="text-sm font-semibold truncate">${animeEp.media.title.english || animeEp.media.title.romaji}</p>
-                                <p class="text-xs text-cyan-500">Episodio ${animeEp.episode}</p>
-                            </div>
-                        `;
-                        animeListContainer.appendChild(animeEl);
-                    });
-
-                    dayCard.classList.add('cursor-pointer', 'hover:bg-gray-700');
-                    dayCard.addEventListener('click', () => showAnimeModal(dateKey));
-
-                } else {
-                    animeListContainer.innerHTML = `<p class="text-gray-500 text-sm h-full flex items-center justify-center">Nada pendiente.</p>`;
-                }
-
-                calendarGrid.appendChild(dayCard);
-            }
-        }
-
-        logoutBtn.addEventListener('click', () => {
-            sessionStorage.removeItem('accessToken');
-            showView('login');
-        });
-
-        // Redirect to AniList login page
-        document.getElementById('login-button').addEventListener('click', loginAniList);
-
-        // Handle authorization code from AniList login
-        handleAuthorizationCode();
-    });
-    </script>
+    // Verificar si ya hay un token de usuario guardado
+    const savedToken = localStorage.getItem('userToken');
+    if (savedToken) {
+      userToken = savedToken;
+      loginBtn.classList.add('hidden');
+      calendarContainer.classList.remove('hidden');
+      loadCalendar();
+    } else {
+      handleAuthResponse();
+    }
+  </script>
 </body>
 </html>
-
