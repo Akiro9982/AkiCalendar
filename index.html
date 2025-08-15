@@ -175,10 +175,10 @@
                 renderCalendar();
                 showView('calendar');
 
-                // Sincronización en tiempo real cada 30 segundos
+                // Sincronización en tiempo real cada 60 segundos
                 setInterval(() => {
                     startUserSession(username);
-                }, 30000); // Actualiza cada 30 segundos (30000ms)
+                }, 60000); // Actualiza cada 60 segundos (60000ms)
 
             } catch (error) {
                 console.error("Error al obtener datos de AniList:", error);
