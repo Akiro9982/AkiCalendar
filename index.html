@@ -77,7 +77,6 @@
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                     </button>
                 </div>
-                <!-- El botón para cambiar de usuario ha sido eliminado -->
             </header>
             <div id="calendar-grid" class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-4">
                 <!-- Las tarjetas de los días se generarán aquí -->
@@ -175,6 +174,11 @@
                 
                 renderCalendar();
                 showView('calendar');
+
+                // Sincronización en tiempo real cada 30 segundos
+                setInterval(() => {
+                    startUserSession(username);
+                }, 30000); // Actualiza cada 30 segundos (30000ms)
 
             } catch (error) {
                 console.error("Error al obtener datos de AniList:", error);
